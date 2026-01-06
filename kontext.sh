@@ -23,7 +23,7 @@ echo_error() {
 }
 
 print_header() {
-    echo -e "${BG_BLACK_GREEN}═════════════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BG_BLACK_GREEN}═${NC}"
+    echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BG_BLACK_GREEN}═${NC}"
     echo -e "${BG_BLACK_CYAN_ITALIC}$1${NC}"
     echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════════════════════${NC}"
 }
