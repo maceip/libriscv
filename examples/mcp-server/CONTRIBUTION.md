@@ -12,7 +12,7 @@ graph TB
     end
 
     subgraph "NEW: Build System"
-        BUILD[build_kontest.sh]
+        BUILD[kontext.sh]
         BUILD --> DEPS[Install Dependencies]
         BUILD --> TOOLCHAIN[RISC-V Toolchain]
         BUILD --> CMAKE[CMake Build]
@@ -307,7 +307,7 @@ graph TB
 
 ```mermaid
 graph TB
-    START[./build_kontest.sh]
+    START[./kontext.sh]
 
     subgraph "NEW: Automated Build System"
         CHECK[Check OS & Versions]
@@ -421,7 +421,7 @@ graph TB
 
 #### Commit 3: `e4da1d0` - Build Automation
 **New Tool:**
-- ✨ `build_kontest.sh` - One-command setup script
+- ✨ `kontext.sh` - One-command setup script
 
 **Capabilities:**
 - Auto-detects Ubuntu version
@@ -455,7 +455,7 @@ graph TB
 
 ```
 libriscv/
-├── build_kontest.sh              ← NEW: Build automation
+├── kontext.sh              ← NEW: Build automation
 └── examples/mcp-server/           ← NEW: Complete directory
     ├── CMakeLists.txt             ← NEW: Build config
     ├── build.sh                   ← NEW: Quick build
@@ -504,7 +504,7 @@ libriscv/
 
 ```bash
 # One-command setup
-./build_kontest.sh
+./kontext.sh
 
 # Run server
 ./examples/mcp-server/build/mcp-server
