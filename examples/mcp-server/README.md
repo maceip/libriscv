@@ -15,6 +15,8 @@ This server enables AI assistants and other MCP clients to execute code safely i
 ### 🌐 Multi-Language Support
 - **C** - Full C17 support with glibc
 - **C++** - Full C++20 with STL and threading (pthread)
+- **JavaScript** - Console.log wrapper (QuickJS integration planned for full runtime)
+- **TypeScript** - Transpiled to JavaScript via tsc or esbuild
 - **Python** - Limited support via compilation
 - **Rust** - Full Rust standard library support
 

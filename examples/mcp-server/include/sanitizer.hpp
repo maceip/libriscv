@@ -47,6 +47,8 @@ private:
     std::string sanitize_c(const std::string& code);
     std::string sanitize_python(const std::string& code);
     std::string sanitize_rust(const std::string& code);
+    std::string sanitize_javascript(const std::string& code);
+    std::string sanitize_typescript(const std::string& code);
 
     std::string remove_comments(const std::string& code, const std::string& language);
 };

@@ -50,6 +50,10 @@ std::string CodeSanitizer::sanitize(const std::string& code, const std::string& 
         return sanitize_python(code);
     } else if (language == "rust") {
         return sanitize_rust(code);
+    } else if (language == "javascript" || language == "js") {
+        return sanitize_javascript(code);
+    } else if (language == "typescript" || language == "ts") {
+        return sanitize_typescript(code);
     } else {
         throw std::runtime_error("Unsupported language for sanitization: " + language);
     }
@@ -218,4 +222,59 @@ std::string CodeSanitizer::remove_comments(const std::string& code, const std::s
     }
 
     return result;
+}
+
+std::string CodeSanitizer::sanitize_javascript(const std::string& code) {
+    // JavaScript-specific sanitization
+    std::vector<ForbiddenPattern> js_patterns = {
+        {"require\\s*\\(\\s*['\"]child_process['\"]", "child_process module is forbidden", true},
+        {"require\\s*\\(\\s*['\"]fs['\"]", "fs module is restricted", true},
+        {"require\\s*\\(\\s*['\"]net['\"]", "net module is restricted", true},
+        {"require\\s*\\(\\s*['\"]http['\"]", "http module is restricted", true},
+        {"require\\s*\\(\\s*['\"]https['\"]", "https module is restricted", true},
+        {"process\\.exit", "process.exit is restricted", false},
+        {"eval\\s*\\(", "eval() is forbidden", true},
+        {"Function\\s*\\(", "Function() constructor is forbidden", true},
+        {"globalThis", "globalThis access is restricted", false},
+        {"global\\.", "global object access is restricted", false},
+        {"__dirname", "__dirname is restricted", false},
+        {"__filename", "__filename is restricted", false},
+    };
+
+    std::string violation;
+    if (check_forbidden_patterns(code, js_patterns, violation)) {
+        throw std::runtime_error("JavaScript code sanitization failed: " + violation);
+    }
+
+    // Basic validation
+    if (code.size() > 1024 * 1024) { // 1MB limit
+        throw std::runtime_error("Code size exceeds maximum allowed size");
+    }
+
+    return code;
+}
+
+std::string CodeSanitizer::sanitize_typescript(const std::string& code) {
+    // TypeScript uses same restrictions as JavaScript plus type-specific ones
+    std::string violation;
+    
+    // First apply JavaScript sanitization
+    try {
+        sanitize_javascript(code);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeScript code sanitization failed: " + std::string(e.what()));
+    }
+    
+    // TypeScript-specific patterns
+    std::vector<ForbiddenPattern> ts_patterns = {
+        {"declare\\s+global", "Global namespace modification is restricted", true},
+        {"@ts-ignore", "TypeScript error suppression is discouraged", false},
+        {"@ts-nocheck", "TypeScript checking bypass is forbidden", false},
+    };
+
+    if (check_forbidden_patterns(code, ts_patterns, violation)) {
+        throw std::runtime_error("TypeScript code sanitization failed: " + violation);
+    }
+
+    return code;
 }

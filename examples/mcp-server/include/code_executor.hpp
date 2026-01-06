@@ -86,6 +86,10 @@ private:
         uint64_t max_instructions
     );
 
+    // JavaScript/TypeScript support
+    bool create_js_wrapper(const std::string& js_file, const std::string& cpp_file);
+    bool transpile_typescript(const std::string& ts_file, const std::string& js_file);
+
     void write_file(const std::string& path, const std::string& content);
     void cleanup_temp_files();
 };

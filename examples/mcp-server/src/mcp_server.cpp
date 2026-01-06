@@ -31,7 +31,7 @@ void MCPServer::initialize_tools() {
     tools_ = {
         {
             {"name", "execute_code"},
-            {"description", "Execute code in a sandboxed RISC-V environment. Supports multiple languages including C, C++, Python, and Rust. Code is compiled to RISC-V, sanitized, and executed with strict resource limits."},
+            {"description", "Execute code in a sandboxed RISC-V environment. Supports multiple languages including C, C++, JavaScript, TypeScript, Python, and Rust. Code is compiled to RISC-V, sanitized, and executed with strict resource limits."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {
@@ -41,7 +41,7 @@ void MCPServer::initialize_tools() {
                     }},
                     {"language", {
                         {"type", "string"},
-                        {"enum", json::array({"c", "cpp", "python", "rust"})},
+                        {"enum", json::array({"c", "cpp", "javascript", "js", "typescript", "ts", "python", "rust"})},
                         {"description", "Programming language of the code"},
                         {"default", "cpp"}
                     }},
@@ -328,6 +328,18 @@ json MCPServer::list_languages(const json& arguments) {
                 {"compiler", "riscv64-linux-gnu-g++"},
                 {"standard", "c++20"},
                 {"description", "C++ with full standard library and threading support"}
+            },
+            {
+                {"language", "javascript"},
+                {"alias", "js"},
+                {"runtime", "C++ wrapper (QuickJS integration planned)"},
+                {"description", "JavaScript with console.log support (limited runtime)"}
+            },
+            {
+                {"language", "typescript"},
+                {"alias", "ts"},
+                {"transpiler", "tsc or esbuild"},
+                {"description", "TypeScript transpiled to JavaScript (requires tsc/esbuild)"}
             },
             {
                 {"language", "python"},

@@ -11,6 +11,8 @@ Compiles and executes code in multiple programming languages within a secure san
 ## Supported Languages
 - **C**: Full C17 support with glibc
 - **C++**: Full C++20 support with standard library and threading
+- **JavaScript**: Basic console.log support (QuickJS integration planned)
+- **TypeScript**: Transpiled to JavaScript (requires tsc or esbuild)
 - **Python**: Python code (compiled to C extension) - limited support
 - **Rust**: Rust with standard library support
 
@@ -30,7 +32,7 @@ int main() {
 
 ### `language` (optional)
 - **Type**: string
-- **Enum**: `c`, `cpp`, `python`, `rust`
+- **Enum**: `c`, `cpp`, `javascript`, `js`, `typescript`, `ts`, `python`, `rust`
 - **Default**: `cpp`
 - **Description**: Programming language of the provided code
 
@@ -124,6 +126,22 @@ Code executes in a complete RISC-V sandbox:
 {
   "code": "#include <stdio.h>\n\nint main() {\n    printf(\"Hello from C!\\n\");\n    return 0;\n}",
   "language": "c"
+}
+```
+
+### JavaScript Example
+```json
+{
+  "code": "console.log('Hello from JavaScript!');\nconsole.log('Sum: ' + (1 + 2 + 3));",
+  "language": "javascript"
+}
+```
+
+### TypeScript Example
+```json
+{
+  "code": "const greeting: string = 'Hello from TypeScript!';\nconsole.log(greeting);\n\nconst add = (a: number, b: number): number => a + b;\nconsole.log('Sum:', add(5, 10));",
+  "language": "typescript"
 }
 ```
 
