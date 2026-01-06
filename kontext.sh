@@ -121,10 +121,25 @@ else
 fi
 
 echo ""
-echo_info "Step 7: Building libriscv MCP server..."
+echo_info "Step 7: Building QuickJS for RISC-V (JavaScript runtime)..."
 
 # Navigate to MCP server directory
 cd "$(dirname "$0")/examples/mcp-server"
+
+# Build QuickJS if RISC-V compiler is available
+if command -v $RISCV_COMPILER &> /dev/null; then
+    echo_info "Building QuickJS for full JavaScript support..."
+    if [ -x "third_party/build_quickjs.sh" ]; then
+        ./third_party/build_quickjs.sh || echo_warn "QuickJS build failed, JavaScript support will be limited"
+    else
+        echo_warn "QuickJS build script not found, JavaScript support will be limited"
+    fi
+else
+    echo_warn "RISC-V compiler not available, skipping QuickJS build"
+fi
+
+echo ""
+echo_info "Step 8: Building libriscv MCP server..."
 
 # Clean previous build
 if [ -d "build" ]; then
@@ -149,7 +164,7 @@ if [ ! -f "mcp-server" ]; then
 fi
 
 echo ""
-echo_info "Step 8: Running basic tests..."
+echo_info "Step 9: Running basic tests..."
 
 # Test 1: Check if server starts
 echo_info "Test 1: Server startup test..."
@@ -181,7 +196,7 @@ fi
 cd ..
 if [ -f "test_client.py" ]; then
     echo ""
-    echo_info "Step 9: Running comprehensive test suite..."
+    echo_info "Step 10: Running comprehensive test suite..."
     if command -v python3 &> /dev/null; then
         python3 test_client.py || echo_warn "Some tests failed, but server built successfully"
     else
@@ -218,8 +233,13 @@ echo ""
 echo "Supported languages:"
 echo "  - C (c17 + glibc)"
 echo "  - C++ (c++20 + STL + pthread)"
-echo "  - JavaScript (console.log wrapper)"
-echo "  - TypeScript (via tsc/esbuild)"
+if [ -f "$(pwd)/third_party/quickjs-riscv/lib/libquickjs.a" ]; then
+    echo "  - JavaScript (Full QuickJS runtime)"
+    echo "  - TypeScript (via tsc/esbuild + QuickJS)"
+else
+    echo "  - JavaScript (console.log wrapper - limited)"
+    echo "  - TypeScript (via tsc/esbuild - limited)"
+fi
 echo "  - Rust (riscv64gc target)"
 echo "  - Python (limited)"
 echo ""

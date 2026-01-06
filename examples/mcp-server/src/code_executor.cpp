@@ -18,6 +18,10 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#ifdef USE_QUICKJS
+#include <sys/stat.h>
+#endif
+
 namespace fs = std::filesystem;
 
 // Default resource limits
@@ -142,6 +146,101 @@ std::string CodeExecutor::get_extension(const std::string& language) {
     return "txt";
 }
 
+#ifdef USE_QUICKJS
+// Check if QuickJS library is available
+static bool is_quickjs_available() {
+    // Check for QuickJS library in third_party directory
+    std::string qjs_lib = "third_party/quickjs-riscv/lib/libquickjs.a";
+    struct stat buffer;
+    return (stat(qjs_lib.c_str(), &buffer) == 0);
+}
+
+// Create a C wrapper that embeds JavaScript code and uses QuickJS API
+static bool create_quickjs_wrapper(const std::string& js_file, const std::string& wrapper_file) {
+    // Read the JavaScript code
+    std::ifstream js_input(js_file);
+    if (!js_input.is_open()) {
+        return false;
+    }
+
+    std::stringstream js_buffer;
+    js_buffer << js_input.rdbuf();
+    std::string js_code = js_buffer.str();
+    js_input.close();
+
+    // Escape the JavaScript code for C string literal
+    std::string escaped_js;
+    for (char c : js_code) {
+        if (c == '"') escaped_js += "\\\"";
+        else if (c == '\\') escaped_js += "\\\\";
+        else if (c == '\n') escaped_js += "\\n";
+        else if (c == '\r') escaped_js += "\\r";
+        else if (c == '\t') escaped_js += "\\t";
+        else escaped_js += c;
+    }
+
+    // Create C wrapper that uses QuickJS API
+    std::ofstream wrapper_output(wrapper_file);
+    if (!wrapper_output.is_open()) {
+        return false;
+    }
+
+    wrapper_output << "#include <quickjs.h>\n";
+    wrapper_output << "#include <quickjs-libc.h>\n";
+    wrapper_output << "#include <stdio.h>\n";
+    wrapper_output << "#include <stdlib.h>\n";
+    wrapper_output << "#include <string.h>\n\n";
+
+    wrapper_output << "static const char js_code[] = \"" << escaped_js << "\";\n\n";
+
+    wrapper_output << "int main(int argc, char **argv) {\n";
+    wrapper_output << "    JSRuntime *rt = JS_NewRuntime();\n";
+    wrapper_output << "    if (!rt) {\n";
+    wrapper_output << "        fprintf(stderr, \"Failed to create QuickJS runtime\\n\");\n";
+    wrapper_output << "        return 1;\n";
+    wrapper_output << "    }\n\n";
+
+    wrapper_output << "    JSContext *ctx = JS_NewContext(rt);\n";
+    wrapper_output << "    if (!ctx) {\n";
+    wrapper_output << "        fprintf(stderr, \"Failed to create QuickJS context\\n\");\n";
+    wrapper_output << "        JS_FreeRuntime(rt);\n";
+    wrapper_output << "        return 1;\n";
+    wrapper_output << "    }\n\n";
+
+    wrapper_output << "    // Add console.log support\n";
+    wrapper_output << "    js_std_add_helpers(ctx, argc, argv);\n";
+    wrapper_output << "    js_std_init_handlers(rt);\n\n";
+
+    wrapper_output << "    // Evaluate the JavaScript code\n";
+    wrapper_output << "    JSValue result = JS_Eval(ctx, js_code, strlen(js_code), \"<code>\", JS_EVAL_TYPE_GLOBAL);\n\n";
+
+    wrapper_output << "    // Check for errors\n";
+    wrapper_output << "    int exit_code = 0;\n";
+    wrapper_output << "    if (JS_IsException(result)) {\n";
+    wrapper_output << "        JSValue exception = JS_GetException(ctx);\n";
+    wrapper_output << "        const char *str = JS_ToCString(ctx, exception);\n";
+    wrapper_output << "        if (str) {\n";
+    wrapper_output << "            fprintf(stderr, \"JavaScript Error: %s\\n\", str);\n";
+    wrapper_output << "            JS_FreeCString(ctx, str);\n";
+    wrapper_output << "        }\n";
+    wrapper_output << "        JS_FreeValue(ctx, exception);\n";
+    wrapper_output << "        exit_code = 1;\n";
+    wrapper_output << "    }\n\n";
+
+    wrapper_output << "    JS_FreeValue(ctx, result);\n";
+    wrapper_output << "    js_std_loop(ctx);\n";
+    wrapper_output << "    js_std_free_handlers(rt);\n";
+    wrapper_output << "    JS_FreeContext(ctx);\n";
+    wrapper_output << "    JS_FreeRuntime(rt);\n\n";
+
+    wrapper_output << "    return exit_code;\n";
+    wrapper_output << "}\n";
+
+    wrapper_output.close();
+    return true;
+}
+#endif
+
 CompilationResult CodeExecutor::compile_code(
     const std::string& source_file,
     const std::string& output_file,
@@ -161,15 +260,34 @@ CompilationResult CodeExecutor::compile_code(
         compile_cmd = "rustc --target riscv64gc-unknown-linux-gnu " +
                      source_file + " -o " + output_file + " 2>&1";
     } else if (language == "javascript" || language == "js") {
-        // Transpile JS to C++ wrapper for execution
-        std::string wrapped_file = source_file + ".cpp";
-        if (!create_js_wrapper(source_file, wrapped_file)) {
-            result.success = false;
-            result.output = "Failed to create JavaScript wrapper";
-            return result;
+#ifdef USE_QUICKJS
+        // Try to use QuickJS if available
+        if (is_quickjs_available()) {
+            std::string quickjs_wrapper = source_file + ".qjs.c";
+            if (!create_quickjs_wrapper(source_file, quickjs_wrapper)) {
+                result.success = false;
+                result.output = "Failed to create QuickJS wrapper";
+                return result;
+            }
+            // Compile with QuickJS library
+            compile_cmd = find_riscv_compiler("gcc") + " -static -O2 " +
+                         "-I third_party/quickjs-riscv/include " +
+                         quickjs_wrapper + " " +
+                         "third_party/quickjs-riscv/lib/libquickjs.a " +
+                         "-o " + output_file + " -lm -ldl -lpthread 2>&1";
+        } else
+#endif
+        {
+            // Fallback: Transpile JS to C++ wrapper for execution
+            std::string wrapped_file = source_file + ".cpp";
+            if (!create_js_wrapper(source_file, wrapped_file)) {
+                result.success = false;
+                result.output = "Failed to create JavaScript wrapper";
+                return result;
+            }
+            compile_cmd = find_riscv_compiler("g++") + " -static -std=c++17 -O2 " +
+                         wrapped_file + " -o " + output_file + " 2>&1";
         }
-        compile_cmd = find_riscv_compiler("g++") + " -static -std=c++17 -O2 " +
-                     wrapped_file + " -o " + output_file + " 2>&1";
     } else if (language == "typescript" || language == "ts") {
         // Transpile TypeScript to JavaScript first
         std::string js_file = source_file + ".js";
@@ -178,15 +296,34 @@ CompilationResult CodeExecutor::compile_code(
             result.output = "Failed to transpile TypeScript. Ensure 'tsc' or 'esbuild' is installed.";
             return result;
         }
-        // Then create C++ wrapper for the JS
-        std::string wrapped_file = js_file + ".cpp";
-        if (!create_js_wrapper(js_file, wrapped_file)) {
-            result.success = false;
-            result.output = "Failed to create JavaScript wrapper";
-            return result;
+#ifdef USE_QUICKJS
+        // Try to use QuickJS if available
+        if (is_quickjs_available()) {
+            std::string quickjs_wrapper = js_file + ".qjs.c";
+            if (!create_quickjs_wrapper(js_file, quickjs_wrapper)) {
+                result.success = false;
+                result.output = "Failed to create QuickJS wrapper";
+                return result;
+            }
+            // Compile with QuickJS library
+            compile_cmd = find_riscv_compiler("gcc") + " -static -O2 " +
+                         "-I third_party/quickjs-riscv/include " +
+                         quickjs_wrapper + " " +
+                         "third_party/quickjs-riscv/lib/libquickjs.a " +
+                         "-o " + output_file + " -lm -ldl -lpthread 2>&1";
+        } else
+#endif
+        {
+            // Fallback: Create C++ wrapper for the JS
+            std::string wrapped_file = js_file + ".cpp";
+            if (!create_js_wrapper(js_file, wrapped_file)) {
+                result.success = false;
+                result.output = "Failed to create JavaScript wrapper";
+                return result;
+            }
+            compile_cmd = find_riscv_compiler("g++") + " -static -std=c++17 -O2 " +
+                         wrapped_file + " -o " + output_file + " 2>&1";
         }
-        compile_cmd = find_riscv_compiler("g++") + " -static -std=c++17 -O2 " +
-                     wrapped_file + " -o " + output_file + " 2>&1";
     } else if (language == "python") {
         // For Python, we could use Cython or similar
         result.success = false;

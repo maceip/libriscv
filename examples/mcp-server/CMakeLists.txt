@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(LTO "Enable interprocedural optimizations" ON)
 option(NATIVE "Enable native instructions" ON)
+option(USE_QUICKJS "Enable QuickJS for full JavaScript runtime support" ON)
 
 # Add libriscv library
 add_subdirectory(../../lib libriscv)
@@ -20,6 +21,36 @@ if(NOT nlohmann_json_FOUND)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(json)
+endif()
+
+# QuickJS support
+if(USE_QUICKJS)
+    set(QUICKJS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/quickjs-riscv")
+    set(QUICKJS_INCLUDE "${QUICKJS_DIR}/include")
+    set(QUICKJS_LIB "${QUICKJS_DIR}/lib/libquickjs.a")
+    set(QUICKJS_BINARY "${QUICKJS_DIR}/bin/qjs")
+
+    # Check if QuickJS is built
+    if(NOT EXISTS "${QUICKJS_LIB}")
+        message(STATUS "QuickJS not found, building for RISC-V...")
+        execute_process(
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_quickjs.sh
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+            RESULT_VARIABLE QUICKJS_BUILD_RESULT
+        )
+        if(NOT QUICKJS_BUILD_RESULT EQUAL 0)
+            message(WARNING "Failed to build QuickJS, disabling support")
+            set(USE_QUICKJS OFF)
+        else()
+            message(STATUS "QuickJS built successfully")
+        endif()
+    else()
+        message(STATUS "Found QuickJS: ${QUICKJS_LIB}")
+    endif()
+
+    if(USE_QUICKJS)
+        add_definitions(-DUSE_QUICKJS=1)
+    endif()
 endif()
 
 # Source files
@@ -38,6 +69,11 @@ target_include_directories(mcp-server PRIVATE
     ${CMAKE_BINARY_DIR}
 )
 
+# Add QuickJS include directory if enabled
+if(USE_QUICKJS)
+    target_include_directories(mcp-server PRIVATE ${QUICKJS_INCLUDE})
+endif()
+
 # Link libraries
 target_link_libraries(mcp-server PRIVATE
     riscv
@@ -46,6 +82,11 @@ target_link_libraries(mcp-server PRIVATE
     m
     stdc++fs  # For std::filesystem on older compilers
 )
+
+# Link QuickJS library if enabled
+if(USE_QUICKJS)
+    target_link_libraries(mcp-server PRIVATE ${QUICKJS_LIB} dl)
+endif()
 
 # Compiler options
 target_compile_options(mcp-server PRIVATE

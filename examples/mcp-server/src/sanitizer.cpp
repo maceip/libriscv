@@ -226,7 +226,11 @@ std::string CodeSanitizer::remove_comments(const std::string& code, const std::s
 
 std::string CodeSanitizer::sanitize_javascript(const std::string& code) {
     // JavaScript-specific sanitization
-    std::vector<ForbiddenPattern> js_patterns = {
+    std::vector<ForbiddenPattern> js_patterns;
+
+#ifndef USE_QUICKJS
+    // Strict sanitization when using C++ wrapper (no runtime sandbox)
+    js_patterns = {
         {"require\\s*\\(\\s*['\"]child_process['\"]", "child_process module is forbidden", true},
         {"require\\s*\\(\\s*['\"]fs['\"]", "fs module is restricted", true},
         {"require\\s*\\(\\s*['\"]net['\"]", "net module is restricted", true},
@@ -240,9 +244,19 @@ std::string CodeSanitizer::sanitize_javascript(const std::string& code) {
         {"__dirname", "__dirname is restricted", false},
         {"__filename", "__filename is restricted", false},
     };
+#else
+    // More permissive when using QuickJS (runtime provides sandboxing)
+    // Only block truly dangerous native modules
+    js_patterns = {
+        {"require\\s*\\(\\s*['\"]child_process['\"]", "child_process module is forbidden", true},
+        {"require\\s*\\(\\s*['\"]fs['\"]", "fs module is restricted", true},
+        // Note: eval() and Function() are allowed in QuickJS as they're sandboxed
+        // Note: process, global, etc. are allowed as QuickJS controls their behavior
+    };
+#endif
 
     std::string violation;
-    if (check_forbidden_patterns(code, js_patterns, violation)) {
+    if (!js_patterns.empty() && check_forbidden_patterns(code, js_patterns, violation)) {
         throw std::runtime_error("JavaScript code sanitization failed: " + violation);
     }
 
