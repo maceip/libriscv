@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "libriscv-code-execution": {
+      "command": "/path/to/libriscv/examples/mcp-server/build/mcp-server",
+      "args": [],
+      "env": {
+        "PATH": "/usr/bin:/bin"
+      }
+    }
+  }
+}
