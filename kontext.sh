@@ -28,7 +28,7 @@ print_header() {
     echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════════════════════${NC}"
 }
 
-print_header "libriscv mcp server - build script\ntarget: ubuntu 20.04+"
+print_header "libriscv mcp server - build script\ntarget: ubuntu 20.04+\nfast riscv js sandbox demo"
 
 # Check if running on Ubuntu
 if [ -f /etc/os-release ]; then
@@ -267,3 +267,5 @@ echo "  2. configure your mcp client (claude desktop, etc.)"
 echo "  3. start executing sandboxed code"
 echo ""
 echo_info "build completed at $(date)"
+echo ""
+echo "fast riscv js sandbox demo"
