@@ -272,10 +272,16 @@ ExecutionResult CodeExecutor::execute_sandboxed(
         machine.setup_linux_syscalls();
         machine.setup_posix_threads();
 
-        // Capture output
-        std::string output;
-        machine.set_printer([&output](auto&, const char* text, size_t len) {
-            output.append(text, len);
+        // Capture output using userdata
+        struct OutputCapture {
+            std::string output;
+        };
+        OutputCapture capture;
+        machine.set_userdata(&capture);
+
+        machine.set_printer([](const riscv::Machine<riscv::RISCV64>& m, const char* text, size_t len) {
+            auto* cap = m.template get_userdata<OutputCapture>();
+            cap->output.append(text, len);
         });
 
         // Execute with instruction limit
@@ -287,7 +293,7 @@ ExecutionResult CodeExecutor::execute_sandboxed(
         }
         auto end_time = micros_now();
 
-        result.output = output;
+        result.output = capture.output;
         result.execution_time_us = end_time - start_time;
         result.instructions_executed = machine.instruction_counter();
         result.exit_code = machine.cpu.reg(10); // A0 register
@@ -384,91 +390,76 @@ bool CodeExecutor::create_js_wrapper(const std::string& js_file, const std::stri
         return false;
     }
     
-    cpp_output << R"(
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <cmath>
-#include <map>
-#include <vector>
-#include <functional>
+    // Write the C++ wrapper code
+    cpp_output << "#include <iostream>\n";
+    cpp_output << "#include <string>\n";
+    cpp_output << "#include <sstream>\n";
+    cpp_output << "#include <cmath>\n";
+    cpp_output << "#include <map>\n";
+    cpp_output << "#include <vector>\n";
+    cpp_output << "#include <functional>\n";
+    cpp_output << "\n";
+    cpp_output << "// Simple JavaScript runtime simulation\n";
+    cpp_output << "class JSRuntime {\n";
+    cpp_output << "public:\n";
+    cpp_output << "    std::map<std::string, std::string> variables;\n";
+    cpp_output << "    std::stringstream output;\n";
+    cpp_output << "    \n";
+    cpp_output << "    void console_log(const std::string& msg) {\n";
+    cpp_output << "        output << msg << std::endl;\n";
+    cpp_output << "    }\n";
+    cpp_output << "    \n";
+    cpp_output << "    std::string get_output() {\n";
+    cpp_output << "        return output.str();\n";
+    cpp_output << "    }\n";
+    cpp_output << "};\n";
+    cpp_output << "\n";
+    cpp_output << "// JavaScript console.log implementation\n";
+    cpp_output << "JSRuntime runtime;\n";
+    cpp_output << "\n";
+    cpp_output << "void console_log(const std::string& msg) {\n";
+    cpp_output << "    runtime.console_log(msg);\n";
+    cpp_output << "}\n";
+    cpp_output << "\n";
+    cpp_output << "// Main execution\n";
+    cpp_output << "int main() {\n";
+    cpp_output << "    std::cout << \"JavaScript Execution Environment\" << std::endl;\n";
+    cpp_output << "    std::cout << \"=================================\" << std::endl;\n";
+    cpp_output << "    std::cout << std::endl;\n";
+    cpp_output << "    \n";
+    cpp_output << "    // Embedded JavaScript code\n";
+    cpp_output << "    std::string js_code = \"" << escaped_js << "\";\n";
+    cpp_output << "    \n";
+    cpp_output << "    std::cout << \"Original JavaScript code:\" << std::endl;\n";
+    cpp_output << "    std::cout << js_code << std::endl;\n";
+    cpp_output << "    std::cout << std::endl;\n";
+    cpp_output << "    \n";
+    cpp_output << "    // Simple console.log pattern matching\n";
+    cpp_output << "    size_t pos = 0;\n";
+    cpp_output << "    while ((pos = js_code.find(\"console.log(\", pos)) != std::string::npos) {\n";
+    cpp_output << "        size_t start = pos + 12;\n";
+    cpp_output << "        size_t end = js_code.find(\")\", start);\n";
+    cpp_output << "        if (end != std::string::npos) {\n";
+    cpp_output << "            std::string arg = js_code.substr(start, end - start);\n";
+    cpp_output << "            // Remove quotes if present\n";
+    cpp_output << "            if (arg.size() >= 2 && arg.front() == '\\\"' && arg.back() == '\\\"') {\n";
+    cpp_output << "                arg = arg.substr(1, arg.size() - 2);\n";
+    cpp_output << "            } else if (arg.size() >= 2 && arg.front() == '\\'' && arg.back() == '\\'') {\n";
+    cpp_output << "                arg = arg.substr(1, arg.size() - 2);\n";
+    cpp_output << "            }\n";
+    cpp_output << "            std::cout << arg << std::endl;\n";
+    cpp_output << "            runtime.console_log(arg);\n";
+    cpp_output << "        }\n";
+    cpp_output << "        pos = end;\n";
+    cpp_output << "    }\n";
+    cpp_output << "    \n";
+    cpp_output << "    std::cout << std::endl;\n";
+    cpp_output << "    std::cout << \"Note: This is a simplified JavaScript runtime.\" << std::endl;\n";
+    cpp_output << "    std::cout << \"Full JavaScript execution via QuickJS integration planned.\" << std::endl;\n";
+    cpp_output << "    \n";
+    cpp_output << "    return 0;\n";
+    cpp_output << "}\n";
 
-// Simple JavaScript runtime simulation
-class JSRuntime {
-public:
-    std::map<std::string, std::string> variables;
-    std::stringstream output;
-    
-    void console_log(const std::string& msg) {
-        output << msg << std::endl;
-    }
-    
-    std::string get_output() {
-        return output.str();
-    }
-};
-
-// JavaScript console.log implementation
-JSRuntime runtime;
-
-void console_log(const std::string& msg) {
-    runtime.console_log(msg);
-}
-
-// Helper function to convert various types to string for console.log
-template<typename T>
-std::string to_js_string(const T& val) {
-    std::ostringstream oss;
-    oss << val;
-    return oss.str();
-}
-
-// Main execution
-int main() {
-    // Embedded JavaScript code (as comments for reference):
-    /*
-)" << escaped_js << R"(
-    */
-    
-    // NOTE: This is a simplified JavaScript runtime.
-    // For full JavaScript execution, integrate QuickJS or similar engine.
-    
-    std::cout << "JavaScript Execution Environment" << std::endl;
-    std::cout << "=================================" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Original JavaScript code:" << std::endl;
-    std::cout << ")" << escaped_js << R"(" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Note: Full JavaScript execution requires QuickJS runtime." << std::endl;
-    std::cout << "This is a placeholder that shows the JS code was received." << std::endl;
-    std::cout << std::endl;
-    
-    // For demonstration, execute simple patterns
-    std::string js_code = R"()" << escaped_js << R"()";
-    
-    // Simple console.log pattern matching
-    size_t pos = 0;
-    while ((pos = js_code.find("console.log(", pos)) != std::string::npos) {
-        size_t start = pos + 12;
-        size_t end = js_code.find(")", start);
-        if (end != std::string::npos) {
-            std::string arg = js_code.substr(start, end - start);
-            // Remove quotes if present
-            if (arg.size() >= 2 && arg.front() == '"' && arg.back() == '"') {
-                arg = arg.substr(1, arg.size() - 2);
-            } else if (arg.size() >= 2 && arg.front() == '\'' && arg.back() == '\'') {
-                arg = arg.substr(1, arg.size() - 2);
-            }
-            std::cout << arg << std::endl;
-            runtime.console_log(arg);
-        }
-        pos = end;
-    }
-    
-    return 0;
-}
-)";
-    
     cpp_output.close();
     return true;
 }
