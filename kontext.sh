@@ -1,48 +1,53 @@
 #!/bin/bash
 set -e
 
-# Colors for output
+# ANSI color codes
+BG_BLACK_GREEN='\033[40;32m'
+BG_BLACK_CYAN_ITALIC='\033[40;36;3m'
+DARK_PURPLE='\033[0;35m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}[info]${NC} $1"
 }
 
 echo_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[warn]${NC} $1"
 }
 
 echo_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[error]${NC} $1"
 }
 
-echo "=========================================="
-echo "libriscv MCP Server - Kontest Build Script"
-echo "Target: Ubuntu 20.04+"
-echo "=========================================="
-echo ""
+print_header() {
+    echo -e "${BG_BLACK_GREEN}═════════════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BG_BLACK_GREEN}═${NC}"
+    echo -e "${BG_BLACK_CYAN_ITALIC}$1${NC}"
+    echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════════════════════${NC}"
+}
+
+print_header "libriscv mcp server - build script\ntarget: ubuntu 20.04+"
 
 # Check if running on Ubuntu
 if [ -f /etc/os-release ]; then
     . /etc/os-release
-    echo_info "Detected OS: $NAME $VERSION"
+    echo_info "detected os: $NAME $VERSION"
     if [[ ! "$NAME" =~ "Ubuntu" ]]; then
-        echo_warn "This script is optimized for Ubuntu 20.04+"
-        echo_warn "Continuing anyway, but you may need to adjust package names..."
+        echo_warn "this script is optimized for ubuntu 20.04+"
+        echo_warn "continuing anyway, but you may need to adjust package names..."
     fi
 else
-    echo_warn "Could not detect OS. Assuming Ubuntu/Debian-based system."
+    echo_warn "could not detect os. assuming ubuntu/debian-based system."
 fi
 
 echo ""
-echo_info "Step 1: Updating package lists..."
+echo_info "step 1: updating package lists..."
 sudo apt-get update
 
 echo ""
-echo_info "Step 2: Installing build essentials..."
+echo_info "step 2: installing build essentials..."
 sudo apt-get install -y \
     build-essential \
     git \
@@ -50,13 +55,13 @@ sudo apt-get install -y \
     curl
 
 echo ""
-echo_info "Step 3: Installing CMake 3.14+..."
+echo_info "step 3: installing cmake 3.14+..."
 CMAKE_VERSION=$(cmake --version 2>/dev/null | head -n1 | grep -oP '\d+\.\d+' || echo "0.0")
 CMAKE_MAJOR=$(echo $CMAKE_VERSION | cut -d. -f1)
 CMAKE_MINOR=$(echo $CMAKE_VERSION | cut -d. -f2)
 
 if [ "$CMAKE_MAJOR" -lt 3 ] || ([ "$CMAKE_MAJOR" -eq 3 ] && [ "$CMAKE_MINOR" -lt 14 ]); then
-    echo_info "CMake version $CMAKE_VERSION is too old. Installing CMake 3.25..."
+    echo_info "cmake version $CMAKE_VERSION is too old. installing cmake 3.25..."
 
     # Remove old cmake if present
     sudo apt-get remove -y cmake || true
@@ -70,13 +75,13 @@ if [ "$CMAKE_MAJOR" -lt 3 ] || ([ "$CMAKE_MAJOR" -eq 3 ] && [ "$CMAKE_MINOR" -lt
 
     # Verify installation
     CMAKE_NEW_VERSION=$(cmake --version | head -n1)
-    echo_info "Installed: $CMAKE_NEW_VERSION"
+    echo_info "installed: $CMAKE_NEW_VERSION"
 else
-    echo_info "CMake version $CMAKE_VERSION is sufficient"
+    echo_info "cmake version $CMAKE_VERSION is sufficient"
 fi
 
 echo ""
-echo_info "Step 4: Installing RISC-V cross-compiler toolchain..."
+echo_info "step 4: installing risc-v cross-compiler toolchain..."
 sudo apt-get install -y \
     gcc-riscv64-linux-gnu \
     g++-riscv64-linux-gnu
@@ -95,55 +100,55 @@ if [ -z "$RISCV_COMPILER" ]; then
 fi
 
 if command -v $RISCV_COMPILER &> /dev/null; then
-    echo_info "Found RISC-V compiler: $RISCV_COMPILER"
+    echo_info "found risc-v compiler: $RISCV_COMPILER"
     $RISCV_COMPILER --version | head -n1
 else
-    echo_error "RISC-V compiler not found!"
+    echo_error "risc-v compiler not found!"
     exit 1
 fi
 
 echo ""
-echo_info "Step 5: Installing nlohmann-json (optional, will auto-fetch if missing)..."
-sudo apt-get install -y nlohmann-json3-dev || echo_warn "nlohmann-json not available via apt, will be fetched by CMake"
+echo_info "step 5: installing nlohmann-json (optional, will auto-fetch if missing)..."
+sudo apt-get install -y nlohmann-json3-dev || echo_warn "nlohmann-json not available via apt, will be fetched by cmake"
 
 echo ""
-echo_info "Step 6: Installing Python3 and TypeScript tools (optional)..."
+echo_info "step 6: installing python3 and typescript tools (optional)..."
 sudo apt-get install -y python3 python3-pip || true
 
 # Try to install TypeScript/JavaScript tooling
 if command -v npm &> /dev/null; then
-    echo_info "npm found, installing TypeScript and esbuild globally..."
-    sudo npm install -g typescript esbuild || echo_warn "Failed to install TypeScript tools"
+    echo_info "npm found, installing typescript and esbuild globally..."
+    sudo npm install -g typescript esbuild || echo_warn "failed to install typescript tools"
 else
-    echo_warn "npm not found. TypeScript/JavaScript execution will be limited."
-    echo_warn "To enable full TypeScript support, install Node.js and run:"
+    echo_warn "npm not found. typescript/javascript execution will be limited."
+    echo_warn "to enable full typescript support, install node.js and run:"
     echo_warn "  sudo npm install -g typescript esbuild"
 fi
 
 echo ""
-echo_info "Step 7: Building QuickJS for RISC-V (JavaScript runtime)..."
+echo_info "step 7: building quickjs for risc-v (javascript runtime)..."
 
 # Navigate to MCP server directory
 cd "$(dirname "$0")/examples/mcp-server"
 
 # Build QuickJS if RISC-V compiler is available
 if command -v $RISCV_COMPILER &> /dev/null; then
-    echo_info "Building QuickJS for full JavaScript support..."
+    echo_info "building quickjs for full javascript support..."
     if [ -x "third_party/build_quickjs.sh" ]; then
-        ./third_party/build_quickjs.sh || echo_warn "QuickJS build failed, JavaScript support will be limited"
+        ./third_party/build_quickjs.sh || echo_warn "quickjs build failed, javascript support will be limited"
     else
-        echo_warn "QuickJS build script not found, JavaScript support will be limited"
+        echo_warn "quickjs build script not found, javascript support will be limited"
     fi
 else
-    echo_warn "RISC-V compiler not available, skipping QuickJS build"
+    echo_warn "risc-v compiler not available, skipping quickjs build"
 fi
 
 echo ""
-echo_info "Step 8: Building libriscv MCP server..."
+echo_info "step 8: building libriscv mcp server..."
 
 # Clean previous build
 if [ -d "build" ]; then
-    echo_info "Cleaning previous build..."
+    echo_info "cleaning previous build..."
     rm -rf build
 fi
 
@@ -151,77 +156,75 @@ fi
 mkdir -p build
 cd build
 
-echo_info "Running CMake..."
+echo_info "running cmake..."
 cmake .. -DCMAKE_BUILD_TYPE=Release
 
-echo_info "Building with $(nproc) cores..."
+echo_info "building with $(nproc) cores..."
 make -j$(nproc)
 
 # Verify build
 if [ ! -f "mcp-server" ]; then
-    echo_error "Build failed! mcp-server executable not found."
+    echo_error "build failed! mcp-server executable not found."
     exit 1
 fi
 
 echo ""
-echo_info "Step 9: Running basic tests..."
+echo_info "step 9: running basic tests..."
 
 # Test 1: Check if server starts
-echo_info "Test 1: Server startup test..."
-timeout 2s ./mcp-server < /dev/null > /dev/null 2>&1 && echo_info "✓ Server starts successfully" || echo_info "✓ Server responds to input"
+echo_info "test 1: server startup test..."
+timeout 2s ./mcp-server < /dev/null > /dev/null 2>&1 && echo_info "server starts successfully" || echo_info "server responds to input"
 
 # Test 2: Send initialize request
-echo_info "Test 2: Initialize request test..."
+echo_info "test 2: initialize request test..."
 INIT_RESPONSE=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | ./mcp-server | head -n1)
 
 if echo "$INIT_RESPONSE" | grep -q "protocolVersion"; then
-    echo_info "✓ Initialize request successful"
+    echo_info "initialize request successful"
 else
-    echo_warn "⚠ Initialize response may be incomplete"
+    echo_warn "initialize response may be incomplete"
 fi
 
 # Test 3: List tools
-echo_info "Test 3: List tools test..."
+echo_info "test 3: list tools test..."
 TOOLS_RESPONSE=$(echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | ./mcp-server | head -n1)
 
 if echo "$TOOLS_RESPONSE" | grep -q "execute_code"; then
-    echo_info "✓ Tools listing successful"
+    echo_info "tools listing successful"
     TOOL_COUNT=$(echo "$TOOLS_RESPONSE" | grep -o "execute_code\|list_languages" | wc -l)
-    echo_info "  Found $TOOL_COUNT tools"
+    echo_info "  found $TOOL_COUNT tools"
 else
-    echo_warn "⚠ Tools listing may be incomplete"
+    echo_warn "tools listing may be incomplete"
 fi
 
 # Test 4: Run Python test client if available
 cd ..
 if [ -f "test_client.py" ]; then
     echo ""
-    echo_info "Step 10: Running comprehensive test suite..."
+    echo_info "step 10: running comprehensive test suite..."
     if command -v python3 &> /dev/null; then
-        python3 test_client.py || echo_warn "Some tests failed, but server built successfully"
+        python3 test_client.py || echo_warn "some tests failed, but server built successfully"
     else
-        echo_warn "Python3 not found, skipping test suite"
+        echo_warn "python3 not found, skipping test suite"
     fi
 else
     echo_warn "test_client.py not found, skipping comprehensive tests"
 fi
 
 echo ""
-echo "=========================================="
-echo_info "✓ Build completed successfully!"
-echo "=========================================="
+print_header "build completed successfully"
 echo ""
-echo "Server location: $(pwd)/build/mcp-server"
+echo "server location: $(pwd)/build/mcp-server"
 echo ""
-echo "Usage:"
-echo "  1. Run server directly:"
+echo "usage:"
+echo "  1. run server directly:"
 echo "     $(pwd)/build/mcp-server"
 echo ""
-echo "  2. Test with Python client:"
+echo "  2. test with python client:"
 echo "     cd $(pwd) && python3 test_client.py"
 echo ""
-echo "  3. Configure with Claude Desktop:"
-echo "     Add to claude_desktop_config.json:"
+echo "  3. configure with claude desktop:"
+echo "     add to claude_desktop_config.json:"
 echo '     {'
 echo '       "mcpServers": {'
 echo '         "code-execution": {'
@@ -230,22 +233,22 @@ echo '         }'
 echo '       }'
 echo '     }'
 echo ""
-echo "Supported languages:"
-echo "  - C (c17 + glibc)"
-echo "  - C++ (c++20 + STL + pthread)"
+echo "supported languages:"
+echo "  - c (c17 + glibc)"
+echo "  - c++ (c++20 + stl + pthread)"
 if [ -f "$(pwd)/third_party/quickjs-riscv/lib/libquickjs.a" ]; then
-    echo "  - JavaScript (Full QuickJS runtime)"
-    echo "  - TypeScript (via tsc/esbuild + QuickJS)"
+    echo "  - javascript (full quickjs runtime)"
+    echo "  - typescript (via tsc/esbuild + quickjs)"
 else
-    echo "  - JavaScript (console.log wrapper - limited)"
-    echo "  - TypeScript (via tsc/esbuild - limited)"
+    echo "  - javascript (console.log wrapper - limited)"
+    echo "  - typescript (via tsc/esbuild - limited)"
 fi
-echo "  - Rust (riscv64gc target)"
-echo "  - Python (limited)"
+echo "  - rust (riscv64gc target)"
+echo "  - python (limited)"
 echo ""
-echo "Next steps:"
-echo "  1. Test the server: python3 test_client.py"
-echo "  2. Configure your MCP client (Claude Desktop, etc.)"
-echo "  3. Start executing sandboxed code!"
+echo "next steps:"
+echo "  1. test the server: python3 test_client.py"
+echo "  2. configure your mcp client (claude desktop, etc.)"
+echo "  3. start executing sandboxed code"
 echo ""
-echo_info "Build completed at $(date)"
+echo_info "build completed at $(date)"
