@@ -23,7 +23,7 @@ echo_error() {
 }
 
 print_header() {
-    echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BG_BLACK_GREEN}═${NC}"
+    echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BG_BLACK_GREEN}═════${NC}"
     echo -e "${BG_BLACK_CYAN_ITALIC}$1${NC}"
     echo -e "${BG_BLACK_GREEN}══════════════════════════════════════════════════════════════════════${NC}"
 }
@@ -197,7 +197,22 @@ else
     echo_warn "tools listing may be incomplete"
 fi
 
-# Test 4: Run Python test client if available
+# Test 4: Execute JavaScript code
+echo_info "test 4: javascript execution test..."
+JS_RESPONSE=$(echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"execute_code","arguments":{"code":"console.log(\"hello from javascript\")","language":"javascript"}}}' | ./mcp-server | head -n1)
+
+if echo "$JS_RESPONSE" | grep -q "hello from javascript"; then
+    echo_info "javascript execution successful"
+    if echo "$JS_RESPONSE" | grep -q "quickjs"; then
+        echo_info "  using quickjs runtime"
+    else
+        echo_info "  using fallback c++ wrapper"
+    fi
+else
+    echo_warn "javascript execution may have failed"
+fi
+
+# Test 5: Run Python test client if available
 cd ..
 if [ -f "test_client.py" ]; then
     echo ""
